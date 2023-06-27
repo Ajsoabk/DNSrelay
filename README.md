@@ -16,8 +16,11 @@ windows 10
 
 
 ## Execution
-```gcc main.c DNSparser.c DNSsocket.c -lwsock32 -lws2_32 -o main
-main```
+```
+gcc main.c DNSparser.c DNSsocket.c -lwsock32 -lws2_32 -o main
+main
+```
 
 ## Example
+新开一个命令行，运行以下命令进行测试
 ```nslookup www.baidu.com 127.0.0.1```

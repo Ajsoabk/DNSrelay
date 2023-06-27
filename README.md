@@ -8,4 +8,4 @@ gcc main.c DNSparser.c DNSsocket.c -lwsock32 -lws2_32 -o main
 main
 
 ## Example
-DNS server: 10.3.9.45
+nslookup www.baidu.com 127.0.0.1

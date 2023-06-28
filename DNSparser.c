@@ -3,6 +3,7 @@
 #include<WinSock2.h>
 #include<ws2tcpip.h>
 #include "DNSpacket.h"
+#include "Debugger.h"
 #define BigLittleSwap16(A)  ((((uint16_t)(A) & 0xff00) >> 8) |(((uint16_t)(A) & 0x00ff) << 8))
 extern int debug_level;
 
@@ -48,20 +49,15 @@ int is_compressed_name(uint8_t ch){
 	return (ch&0xC0)==0xC0;
 }
 int parse_host_name(uint8_t *msg,unsigned short *cur,char *host_name,int *offset){
-printf("parse_host_name: msg_offset=%x\n",*cur);
+	log_debug(log_level_global,"cur=%ud,host_name=%s,name_offset=%d\n",*cur,host_name,*offset);
 	int msg_offset=*cur;
 	int name_offset=*offset;
 	uint8_t label_len;
 	while(msg[msg_offset]!='\0'){//读取其中一个question段中的每一级主机名
 		label_len=*((uint8_t*)(msg+msg_offset));
-		
-printf("msg[%d]=%ud,is_compressed_name(%ud)=%d,host_name=%s\n",msg_offset,label_len,label_len,is_compressed_name(label_len),host_name);
-printf("msg[%d]=%ud\n",msg_offset+1,msg[msg_offset+1]);
-		
-		
 		if(is_compressed_name(label_len)){
 			unsigned short tmp_offset=(BigLittleSwap16(*((uint16_t *)(msg+msg_offset))))&0x3fff;
-printf("parse_host_name\tjump to %d,ntohs(msg[%d])=%x\n",tmp_offset,msg_offset,BigLittleSwap16(*((uint16_t *)(msg+msg_offset))));
+			log_debug(log_level_global,"jump to %d\n",tmp_offset);
 			msg_offset+=2;
 			parse_host_name(msg,&tmp_offset,host_name,&name_offset);
 			name_offset++;
@@ -71,7 +67,6 @@ printf("parse_host_name\tjump to %d,ntohs(msg[%d])=%x\n",tmp_offset,msg_offset,B
 		//读取该级主机名中的每个字符
 		while(label_len--){
 			host_name[name_offset]=msg[msg_offset];
-printf("\t\t\thost_name[%d]=%d\n",name_offset,(unsigned char)host_name[name_offset]);
 			msg_offset++;
 			name_offset++;
 		}

@@ -1,9 +1,12 @@
 #include<WinSock2.h>
 #include"DNSsocket.h"
 #include<stdio.h>
+#include<string.h>
 #include"DNSpacket.h"
 #include<Windows.h>
 #include"DNSparser.h"
+
+#include"Debugger.h"
 #include"PendingQuery.h"
 
 SOCKET localDNSSocket;
@@ -99,22 +102,39 @@ int my_send_to_server(char *buf,int len){
 	struct sockaddr_in addr=get_server_addr();
 	return my_send_to(buf,len,(SOCKADDR*)&addr);
 }
-int my_recv_dns_msg(packet_Information *packet){
+int has_debug_msg(packet_Information *pac){
+	if(pac!=NULL){
+		DNSQuestion* qptr=pac->question_head;
+		while(qptr!=NULL){
+			if(strcmp(qptr->host_name,"debug")){
+				return 1;
+			}
+			qptr=qptr->next;
+		}
+	}
+	return 0;
+}
+
+int my_recv_dns_msg(){
+	packet_Information packet_info;
+	packet_Information *packet=&packet_info;
+	ZeroMemory((void*)&packet_info,sizeof(packet_info));
 	
 	uint8_t RecvBuf[1024];
 	int BufLen=1024;
 	ZeroMemory(RecvBuf,BufLen);
 	struct sockaddr_in SenderAddr;
 	int SenderAddrSize = sizeof (SenderAddr);
+	log_info(log_level_global,"listening on the port 53");
 	int recvBytesCnt=recvfrom(localDNSSocket,RecvBuf, BufLen, 0, (SOCKADDR *)&SenderAddr, &SenderAddrSize);
-printf("RecvBuf[30]=%x,receive %d bytes\n",(ntohs(RecvBuf[30])),recvBytesCnt);
 	if(recvBytesCnt==SOCKET_ERROR){
-		printf("recvfrom failed with error %d\n",WSAGetLastError());
+		log_err(log_level_global,"recvfrom failed with error %d\n",WSAGetLastError());
 		return 1;
 	}
 	else {
 		sprintf(packet->source_ip,"%s",inet_ntoa(SenderAddr.sin_addr));
 		packet->source_port=htons(SenderAddr.sin_port);
+		log_info(log_level_global,"receive a packet from %s:%d\n",packet->source_ip,packet->source_port);
 		parse_Dns_Message(RecvBuf,recvBytesCnt,packet);
 		if(packet->packet_type){//Response
 			int recv_port=pop_by_id(packet->packet_id);
@@ -129,8 +149,16 @@ printf("RecvBuf[30]=%x,receive %d bytes\n",(ntohs(RecvBuf[30])),recvBytesCnt);
 			}
 		}
 		else{
-			
+			//check if there are any debug message
+			if(has_debug_msg(packet)){
+				log_level_global=LOG_LEVEL_ALL;
+				log_debug(log_level_global,"switch to debug mode");
+				clean_up_packet(packet);
+				return 0;
+			}
 			push_in_pool(packet->packet_id,packet->source_port);
+			
+			clean_up_packet(packet);
 			if(my_send_to_server(RecvBuf,recvBytesCnt)){
 				return 1;
 			}

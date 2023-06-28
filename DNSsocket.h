@@ -3,7 +3,7 @@
 #include"DNSpacket.h"
 
 int initilization();
-int my_recv_dns_msg(packet_Information *pac);
+int my_recv_dns_msg();
 int cleanup_All();
 
 #endif

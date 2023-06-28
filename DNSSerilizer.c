@@ -1,7 +1,7 @@
 #include"DNSpacket.h"
 #include<stdio.h>
 #include<stdint.h>
-
+#include"Debugger.h"
 int convert_dot_to_digit(char* host_name,unsigned char *buf){
 	char *name_ptr=host_name;
 	char *last_place=buf;
@@ -72,7 +72,7 @@ int split_ipv6_by_comma(char *ipv6,unsigned char *buf){
 	buf[buf_offset+1]=(unsigned char)(addr&0x00ff);
 	return 0;
 }
-
+/*
 int main(int argc, char **argv){
 	/*
 	//code to test conver_dot_to_digit function
@@ -104,14 +104,20 @@ int main(int argc, char **argv){
 	split_ipv6_by_comma(argv[1],ret);
 	printf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\n",ret[0],ret[1],ret[2],ret[3],ret[4],ret[5],ret[6],ret[7],ret[8],ret[9],ret[10],ret[11],ret[12],ret[13],ret[14],ret[15]);
 	return 0;
+}
+
 	*/
-}
-
-int serialize_question(DNSQuestion* question, uint8_t *buf,int *len){
-
-}
+	
 int serialize_rr(DNSResourceRecord* rr,uint8_t *buf,int *len){
-
+	if(rr->type==1){
+		buf
+	}
+	else if(rr->type==5){
+		
+	}
+	else if(rr->type==28){
+		
+	}
 }
 int serialize_packet(packet_Information* pac,uint8_t *buf,int *len){
 	

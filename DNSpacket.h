@@ -83,7 +83,7 @@ typedef struct DNSResourceRecord{
 
 
 typedef struct packet_Information{
-	char source_ip[100];
+	char source_ip[50];
 	int source_port;
 	int packet_id;
 	DNSQuestion* question_head;
@@ -95,5 +95,5 @@ typedef struct packet_Information{
 	int ancnt;
 	
 }packet_Information;
-
+void clean_up_packet(packet_Information *pac);
 #endif

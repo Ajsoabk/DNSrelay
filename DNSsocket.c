@@ -2,14 +2,12 @@
 #include"DNSsocket.h"
 #include<stdio.h>
 #include"DNSpacket.h"
+#include<Windows.h>
 #include"DNSparser.h"
+#include"PendingQuery.h"
 
-typedef struct Pending_Query{
-	int id;
-	int port;
-	struct Pending_Query* next;
-}Pending_Query;
 SOCKET localDNSSocket;
+char dns_server_addr[100]="10.3.9.44";
 int my_close_socket(SOCKET soc){
 	int nResult = closesocket(soc);
 	if(nResult==SOCKET_ERROR){
@@ -46,7 +44,7 @@ struct sockaddr_in get_loop_addr(int port){
 	return get_addr(port,inet_addr("127.0.0.1"));
 }
 struct sockaddr_in get_server_addr(){
-	return get_addr(53,inet_addr("10.3.9.45"));
+	return get_addr(53,inet_addr(dns_server_addr));
 }
 
 int bind_Socket(SOCKET ret,int port){
@@ -69,9 +67,8 @@ int create_And_Bind(SOCKET *ret,int port){
 	}
 	return 0;
 }
-
-Pending_Query *head=NULL;
 int initilization(){
+	
 	WSADATA wsaData;
 	int nResult = WSAStartup(MAKEWORD(2,2),&wsaData);
 	if(nResult!=0){
@@ -83,7 +80,6 @@ int initilization(){
 		WSACleanup();
 		return 1;
 	}
-	head=NULL;
 	return 0;
 }
 int my_send_to(char *dataFrame,int dfsize,SOCKADDR *destAddr){
@@ -105,11 +101,13 @@ int my_send_to_server(char *buf,int len){
 }
 int my_recv_dns_msg(packet_Information *packet){
 	
-	static char RecvBuf[1024];
-	static int BufLen=1024;
+	uint8_t RecvBuf[1024];
+	int BufLen=1024;
+	ZeroMemory(RecvBuf,BufLen);
 	struct sockaddr_in SenderAddr;
 	int SenderAddrSize = sizeof (SenderAddr);
 	int recvBytesCnt=recvfrom(localDNSSocket,RecvBuf, BufLen, 0, (SOCKADDR *)&SenderAddr, &SenderAddrSize);
+printf("RecvBuf[30]=%x,receive %d bytes\n",(ntohs(RecvBuf[30])),recvBytesCnt);
 	if(recvBytesCnt==SOCKET_ERROR){
 		printf("recvfrom failed with error %d\n",WSAGetLastError());
 		return 1;
@@ -119,46 +117,24 @@ int my_recv_dns_msg(packet_Information *packet){
 		packet->source_port=htons(SenderAddr.sin_port);
 		parse_Dns_Message(RecvBuf,recvBytesCnt,packet);
 		if(packet->packet_type){//Response
-			printf("parsing a response packet with id %d\n",packet->packet_id);
-			Pending_Query *query_ptr=head;
-			Pending_Query *previous_ptr=NULL;
-			int recv_port=-1;
-			while(query_ptr!=NULL){
-				if(query_ptr->id==packet->packet_id){
-					recv_port=query_ptr->port;
-					if(previous_ptr!=NULL){
-						previous_ptr->next=query_ptr->next;
-					}
-					else{
-						head=NULL;
-					}
-					
-					free(query_ptr);
-					break;
-				}
-				previous_ptr=query_ptr;
-				query_ptr=query_ptr->next;
+			int recv_port=pop_by_id(packet->packet_id);
+			if(recv_port==-1){
+				printf("cannot find the pending query with id %d\n",packet->packet_id);
 			}
-			if(recv_port!=-1){
-				if(my_send_to_port(recv_port,RecvBuf,recvBytesCnt)){
-					return 1;
-				}
-				else{
-					printf("my_recv_dns_msg:\t\t\tsend a packet to %s:%d with id:%d\n","127.0.0.1",recv_port,packet->packet_id);
-				}
+			else if(my_send_to_port(recv_port,RecvBuf,recvBytesCnt)){
+				return 1;
+			}
+			else {
+				printf("my_recv_dns_msg:\t\t\tsend a packet to %s:%d with id:%d\n","127.0.0.1",recv_port,packet->packet_id);
 			}
 		}
 		else{
-			Pending_Query *query_ptr=(Pending_Query *)malloc(sizeof(Pending_Query));
-			query_ptr->id=packet->packet_id;
-			query_ptr->port=packet->source_port;
-			query_ptr->next=head;
-			head=query_ptr;
+			
+			push_in_pool(packet->packet_id,packet->source_port);
 			if(my_send_to_server(RecvBuf,recvBytesCnt)){
 				return 1;
 			}
 		}
-		printf("my_recv_dns_msg:\t\t\treceive a packet from%s:%d with id:%d\n",packet->source_ip,packet->source_port,packet->packet_id);
 	}
 	return 0;
 }

@@ -51,11 +51,11 @@ struct sockaddr_in get_server_addr(){
 }
 
 int bind_Socket(SOCKET ret,int port){
-	printf("bind to %d port of the local machine...\n",port);
+	log_debug(log_level_global,"bind to %d of local machine",port);
 	struct sockaddr_in localDelayAddr=get_local_addr(53);
 	int nResult = bind(ret, (SOCKADDR*)&localDelayAddr,sizeof(localDelayAddr));
 	if(nResult!= 0){
-		printf("bind failed with error %d\n",WSAGetLastError());
+		log_err(log_level_global,"bind failed with error %d\n",WSAGetLastError());
 		return 1;
 	}
 	return 0;
@@ -78,7 +78,7 @@ int initilization(){
 		printf("WSAStartup failed with code %d\n",nResult);
 		return 1;
 	}
-	printf("Successfully start WSA\n");
+	log_debug(log_level_global,"successfully start WSA\n");
 	if(create_And_Bind(&localDNSSocket,53)){
 		WSACleanup();
 		return 1;
@@ -102,11 +102,12 @@ int my_send_to_server(char *buf,int len){
 	struct sockaddr_in addr=get_server_addr();
 	return my_send_to(buf,len,(SOCKADDR*)&addr);
 }
+
 int has_debug_msg(packet_Information *pac){
 	if(pac!=NULL){
 		DNSQuestion* qptr=pac->question_head;
 		while(qptr!=NULL){
-			if(strcmp(qptr->host_name,"debug")){
+			if(strcmp(qptr->host_name,"debug")==0){
 				return 1;
 			}
 			qptr=qptr->next;
@@ -119,17 +120,18 @@ int my_recv_dns_msg(){
 	packet_Information packet_info;
 	packet_Information *packet=&packet_info;
 	ZeroMemory((void*)&packet_info,sizeof(packet_info));
+	int ret_val=0;
 	
 	uint8_t RecvBuf[1024];
 	int BufLen=1024;
 	ZeroMemory(RecvBuf,BufLen);
 	struct sockaddr_in SenderAddr;
 	int SenderAddrSize = sizeof (SenderAddr);
-	log_info(log_level_global,"listening on the port 53");
+	log_info(log_level_global,"listening on the port 53...\n");
 	int recvBytesCnt=recvfrom(localDNSSocket,RecvBuf, BufLen, 0, (SOCKADDR *)&SenderAddr, &SenderAddrSize);
 	if(recvBytesCnt==SOCKET_ERROR){
 		log_err(log_level_global,"recvfrom failed with error %d\n",WSAGetLastError());
-		return 1;
+		ret_val=1;
 	}
 	else {
 		sprintf(packet->source_ip,"%s",inet_ntoa(SenderAddr.sin_addr));
@@ -139,30 +141,37 @@ int my_recv_dns_msg(){
 		if(packet->packet_type){//Response
 			int recv_port=pop_by_id(packet->packet_id);
 			if(recv_port==-1){
-				printf("cannot find the pending query with id %d\n",packet->packet_id);
+				log_err(log_level_global,"cannot find the pending query with id %d\n",packet->packet_id);
+				ret_val=1;
 			}
 			else if(my_send_to_port(recv_port,RecvBuf,recvBytesCnt)){
-				return 1;
+				ret_val=1;
 			}
-			else {
-				printf("my_recv_dns_msg:\t\t\tsend a packet to %s:%d with id:%d\n","127.0.0.1",recv_port,packet->packet_id);
+			else{
+				log_info(log_level_global,"successfully send dns packet %d to %s:%d\n",packet->packet_id,"127.0.0.1",recv_port);
 			}
 		}
 		else{
 			//check if there are any debug message
 			if(has_debug_msg(packet)){
 				log_level_global=LOG_LEVEL_ALL;
-				log_debug(log_level_global,"switch to debug mode");
-				clean_up_packet(packet);
-				return 0;
+				log_debug(log_level_global,"switch to debug mode\n");
 			}
-			push_in_pool(packet->packet_id,packet->source_port);
-			
-			clean_up_packet(packet);
-			if(my_send_to_server(RecvBuf,recvBytesCnt)){
-				return 1;
+			else{
+				
+				push_in_pool(packet->packet_id,packet->source_port);
+				log_debug(log_level_global,"query with id %d , port %d is pending for response\n",packet->packet_id,packet->source_port);
+				if(my_send_to_server(RecvBuf,recvBytesCnt)){
+					log_err(log_level_global,"failed to send query to server\n");
+					ret_val=1;
+				}
+				else{
+					log_debug(log_level_global,"successfully send query %d to server\n",packet->packet_id);
+				}
 			}
 		}
 	}
+	clean_up_packet(packet);
+	log_debug(log_level_global,"complete \n\n");
 	return 0;
 }

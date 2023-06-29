@@ -40,7 +40,7 @@ extern enum LOG_LEVEL log_level_global;
 #define log_debug(level,format, ...) \
     do { \
          if(level>=LOG_LEVEL_ALL)\
-           printf("[INFO @%s:%d->%s]" format,\
+           printf("[DEBUG @%s:%d->%s]" format,\
                      __FILE__, __LINE__, __func__, ##__VA_ARGS__ );\
     } while (0)
 

@@ -4,6 +4,7 @@
 #include<ws2tcpip.h>
 #include "DNSpacket.h"
 #include "Debugger.h"
+#include "DNScache.h"
 #define BigLittleSwap16(A)  ((((uint16_t)(A) & 0xff00) >> 8) |(((uint16_t)(A) & 0x00ff) << 8))
 extern int debug_level;
 
@@ -44,6 +45,10 @@ void print_parse_result(packet_Information* pac){
 	int a_cnt=pac->ancnt;
 	printf("acnt:%d\n",a_cnt);
 	for(int i=1;i<=a_cnt;++i){
+DNScache
+    add_rr(rrptr->name,rrptr->type,rrptr->ttl,rrptr->rdata);
+    //printCache(rrptr);
+		//print_rr(rrptr);
 		print_rr(log_level_global,rrptr);
 		rrptr=rrptr->next;
 	}

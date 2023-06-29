@@ -5,7 +5,11 @@
 #include"Debugger.h"
 
 #define BigLittleSwap16(A)  ((((uint16_t)(A) & 0xff00) >> 8) |(((uint16_t)(A) & 0x00ff) << 8))
+/*
+把带点号的域名转换成协议里要求的格式，即点号用子域名长度代替
+*/
 int convert_dot_to_digit(char* host_name,unsigned char *buf,int *len){
+	
 	char *name_ptr=host_name;
 	char *last_place=buf;
 	char *buf_ptr=buf+1;
@@ -31,6 +35,11 @@ int convert_dot_to_digit(char* host_name,unsigned char *buf,int *len){
 	*len=offset;
 	return 0;
 }
+/*
+把点分十进制的ipv4地址转换成4字节的网络地址
+127.0.0.1
+01111111 00000000 0000000 00000001
+*/
 int split_ipv4_by_dots(char *ipv4,unsigned char*buf){
 	char *ch_ptr=ipv4;
 	uint8_t addr=0,digit=0,buf_offset=0;
@@ -50,6 +59,12 @@ int split_ipv4_by_dots(char *ipv4,unsigned char*buf){
 	return 0;
 	
 }
+/*
+把ipv6的标准地址转换成16字节的网络地址
+2a03:2880:f10f:0083:face:b00c:0000:25de
+->
+2a032880f10f...
+*/
 int split_ipv6_by_comma(char *ipv6,unsigned char *buf){
 	char *ch_ptr=ipv6;
 	uint16_t addr=0,digit=0,buf_offset=0;
@@ -78,6 +93,9 @@ int split_ipv6_by_comma(char *ipv6,unsigned char *buf){
 	buf[buf_offset+1]=(unsigned char)(addr&0x00ff);
 	return 0;
 }
+/*
+首部序列化
+*/
 int serialize_dns_head(packet_Information* pac,uint8_t *buf,int *buf_offset){
 	log_debug(log_level_global,"serializing the packet head\n");
 	DNSHeader new_header;
@@ -97,7 +115,9 @@ int serialize_dns_head(packet_Information* pac,uint8_t *buf,int *buf_offset){
 	log_debug(log_level_global,"Successfully serialized the packet head\n");
 	return 0;
 }
-	
+/*
+quesiton序列化
+*/
 int serialize_question(DNSQuestion* qptr,uint8_t *buf,int *buf_offset){
 	log_debug(log_level_global,"serializing question\n");
 	if(qptr==NULL){
@@ -111,7 +131,9 @@ int serialize_question(DNSQuestion* qptr,uint8_t *buf,int *buf_offset){
 	*buf_offset=offset;
 	log_debug(log_level_global,"Successfully serialized question\n");
 }
-
+/*
+资源记录（rr）序列化
+*/
 int serialize_rr(DNSResourceRecord* rrptr,uint8_t *buf,int *buf_offset){
 	log_debug(log_level_global,"serializing resource record\n");
 	if(rrptr==NULL){
@@ -138,6 +160,9 @@ int serialize_rr(DNSResourceRecord* rrptr,uint8_t *buf,int *buf_offset){
 	return 0;
 	log_debug(log_level_global," Successfully serialized resource record\n");
 }
+/*
+dns包序列化
+*/
 int serialize_packet(packet_Information* pac,uint8_t *buf,int *len){
 	log_debug(log_level_global,"serializing packet...\n");
 	if(pac==NULL){

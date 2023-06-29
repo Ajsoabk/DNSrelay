@@ -10,6 +10,7 @@ enum LOG_LEVEL {
 	LOG_LEVEL_ALL
 };
 extern enum LOG_LEVEL log_level_global;
+
 #define log_fatal(level,format, ...) \
     do { \
          if(level>=LOG_LEVEL_FATAL)\

@@ -174,15 +174,37 @@ int my_recv_dns_msg(){
 				log_debug(log_level_global,"switch to debug mode\n");
 			}
 			else if(has_msg(packet,"0.0.0.0")){
+				/*
+				逐行读一个静态表，table.txt
+				判断packet->question_head->host_name是否等于当前行的域名
+				如果相等
+					组装一个rcode=3的错误dns包
+					发送回去
+				
+				*/
 				int len=0;
 				packet_Information err_packet;
 				SecureZeroMemory((void*)&err_packet,sizeof(err_packet));
 				err_packet.packet_id=packet->packet_id;
 				err_packet.rcode=3;
 				err_packet.packet_type=1;//Response;
+				/*
+				DNSResourceRecord* rrptr=(DNSResourceRecord*)malloc(sizeof(DNSResourceRecord*));
+				rrptr->name=(char *)malloc(sizeof("0.0.0.0"));
+				strcpy(rrptr->name,"0.0.0.0");
+				rrptr->type=1;
+				rrptr->net_class=1;
+				rrptr->rdata
+				*/
 				uint8_t SendBuf[1024];
-				serialize_packet(&err_packet,SendBuf,&len);
-				my_send_to_port(packet->source_port,SendBuf,len);
+				if(serialize_packet(&err_packet,SendBuf,&len)){
+					log_debug(log_level_global,"failed to serialize\n");
+					ret_val=1;
+				}
+				else{
+					
+					my_send_to_port(packet->source_port,SendBuf,len);
+				}
 			}
 			else{
 				

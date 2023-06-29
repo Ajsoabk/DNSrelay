@@ -15,9 +15,10 @@ int parse_host_name(uint8_t *msg,unsigned short *cur,char *host_name,int *offset
 	int msg_offset=*cur;
 	int name_offset=*offset;
 	uint8_t label_len;
-	while(msg[msg_offset]!='\0'){//读取其中一个question段中的每一级主机名
+	while(msg[msg_offset]!='\0'){//读取每一级子域名
 		label_len=*((uint8_t*)(msg+msg_offset));
-		if(is_compressed_name(label_len)){
+		if(is_compressed_name(label_len)){//判断这个字节是否是偏移量
+			//读取其后的两个字节并且转换成主机字节（小端方式）
 			unsigned short tmp_offset=(BigLittleSwap16(*((uint16_t *)(msg+msg_offset))))&0x3fff;
 			log_debug(log_level_global,"jump to %d\n",tmp_offset);
 			msg_offset+=2;
@@ -49,23 +50,30 @@ int parse_host_name(uint8_t *msg,unsigned short *cur,char *host_name,int *offset
 }		
 
 int parse_resource_record(uint8_t *msg,unsigned short *ret_offset,DNSResourceRecord **rr){
+	//解析name字段，即待请求的资源名
 	log_debug(log_level_global,"parsing rr at %d\n",*ret_offset);
 	unsigned short msg_offset=*ret_offset;
 	char host_name[MAX_HOST_NAME];
+	//ZeroMemory(..);
 	SecureZeroMemory(host_name,MAX_HOST_NAME);
 	int name_len=0;
 	int data_len;
 	parse_host_name(msg,&msg_offset,host_name,&name_len);
 	log_debug(log_level_global,"host name parsed as %s with len %d\n",host_name,name_len);
 	
+	//tmp->name=host_name;why not?
 	DNSResourceRecord *tmp=(DNSResourceRecord *)malloc(sizeof(DNSResourceRecord));
 	if(tmp==NULL){
 		log_err(log_level_global,"failed to alloc memory to DNSResourceRecord\n");
 	}
 	tmp->name=(char *)malloc(sizeof(char)*(name_len+1));
+	//把host_name copy 到tmp->name 中来
 	memcpy(tmp->name,host_name,name_len+1);
 	log_debug(log_level_global,"host name copied to tmp->name\n");
 	
+	//ntohs:network to host in short(2 bytes)
+	//ntohl:...                long(4 bytes)
+	//msg[msg_offset] why not?
 	tmp->type=ntohs(*(uint16_t *)(msg+msg_offset));
 	msg_offset+=2;
 	tmp->net_class=ntohs(*(uint16_t *)(msg+msg_offset));
@@ -85,12 +93,12 @@ int parse_resource_record(uint8_t *msg,unsigned short *ret_offset,DNSResourceRec
 		msg_offset-=data_len;
 		log_debug(log_level_global,"CNAME type,rdata=%s with len %d\n",tmp->rdata,data_len);
 	}
-	else if(tmp->type==1){//A
+	else if(tmp->type==1){//A,32 bits,4 bytes
 		tmp->rdata=(uint8_t *)malloc(20);
 		sprintf(tmp->rdata,"%d.%d.%d.%d",msg[msg_offset],msg[msg_offset+1],msg[msg_offset+2],msg[msg_offset+3]);
 		log_debug(log_level_global,"A type, ipv4:%s\n",tmp->rdata);
 	}
-	else if(tmp->type==28){//AAAA
+	else if(tmp->type==28){//AAAA,128 bits,16 bytes.
 		DWORD ipbufferlength = 46;
 		tmp->rdata=(uint8_t *)malloc(ipbufferlength);
 		uint8_t *t=msg+msg_offset;
@@ -137,7 +145,11 @@ DNSQuestion* create_question(uint8_t *host_name,short type,short net_class){
 	}
 	return question;
 }
-
+/*
+[in] byte array to be parsed
+[out] the length of the question section
+[out] parsed result
+*/
 int parse_question(uint8_t *msg,unsigned short *ret_offset,DNSQuestion **question){
 	unsigned short msg_offset=*ret_offset;
 	char host_name[MAX_HOST_NAME];
@@ -170,6 +182,10 @@ int parse_questions_sections(uint8_t *msg,int len,unsigned short* ret_offset,pac
 	while(q_cnt--){
 		log_debug(log_level_global,"parse %d question at %d\n",q_cnt,msg_offset);
 		DNSQuestion* new_question=NULL;
+		/*
+		DNSQuestion* new_question=(DNSQuestion*) malloc(sizeof(DNSQuestion*));
+		parse_question(msg,&msg_offset,new_question);
+		*/
 		parse_question(msg,&msg_offset,&new_question);
 		if(new_question==NULL){
 			log_err(log_level_global,"parse_question failed due to a failure in mallocing memory");
@@ -189,6 +205,7 @@ int parse_Dns_Message(uint8_t* msg,int len,packet_Information *pac){
 	}
 	unsigned short msg_offset=sizeof(DNSHeader);
 	int q_cnt=0;
+	//parse header
 	DNSHeader *header_ptr=(DNSHeader*)msg;
 	DNSQuestion* question_tail=NULL;
 	pac->question_head=NULL;
@@ -201,12 +218,12 @@ int parse_Dns_Message(uint8_t* msg,int len,packet_Information *pac){
 	log_debug(log_level_global,"parsed head: id=%d, %s,%s,%s,qdcnt=%d,ancnt=%d\n",pac->packet_id,pac->packet_type?"query response":"query",\
 		pac->query_type==1?"standard query":(pac->query_type==2?"inverse_query":"unknown"),pac->recursion_desired?"recursion disired":"recursion not disired",pac->qdcnt,pac->ancnt);
 	
+	
 	parse_questions_sections(msg,len,&msg_offset,pac);
 	log_debug(log_level_global,"question section parsed\n");
 	
 	
 	if(GET_QR(header_ptr)){
-		
 		parse_rr_section(msg,len,&msg_offset,pac);
 		log_debug(log_level_global,"resource_records parsed\n");
 	}

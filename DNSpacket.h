@@ -58,16 +58,23 @@ typedef struct DNSQuestion {
 }DNSQuestion;
 
 typedef struct DNSResourceRecord{
+	//待请求的资源名
 	char *name;
-	uint16_t type;
+	
 	/*
 	type 	A(1),AAAA(28),CNAME(5)
 	*/
-	uint16_t net_class;
+	uint16_t type;
+	
 	/*
 	class	IN(1)
 	*/
+	uint16_t net_class;
+	
+	//time to live
 	uint32_t ttl;
+	
+	//回答
 	uint8_t *rdata;
 	struct DNSResourceRecord* next;
 }DNSResourceRecord;
@@ -78,8 +85,11 @@ typedef struct packet_Information{
 	int source_port;
 	int packet_id;
 	int rcode;
+	
+	//link list
 	DNSQuestion* question_head;
 	DNSResourceRecord* rr_head;
+	
 	int packet_type;
 	int query_type;
 	int recursion_desired;

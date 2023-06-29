@@ -5,6 +5,7 @@
 #include<stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
 char cache_file[]="cache.txt";
 int cache_rr(DNSResourceRecord *rrptr){
 	log_debug(log_level_global,"caching resource record...\n");

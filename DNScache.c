@@ -2,7 +2,6 @@
 #include "Debugger.h"
 #include "DNSpacket.h"
 #include "DNScache.h"
-
 #include<stdlib.h>
 #include <stdint.h>
 #include <string.h>

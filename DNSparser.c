@@ -6,49 +6,7 @@
 #include "Debugger.h"
 #include "DNScache.h"
 #define BigLittleSwap16(A)  ((((uint16_t)(A) & 0xff00) >> 8) |(((uint16_t)(A) & 0x00ff) << 8))
-extern int debug_level;
 
-void print_rr(int log_level,DNSResourceRecord* ptr){
-	if(log_level>=LOG_LEVEL_ALL){
-		
-		if(ptr==NULL)
-			printf("NULL\n");
-		else{
-			printf("type:%d\n",ptr->type);
-			printf("name:%s\n",ptr->name);
-			printf("rdata:%s\n",ptr->rdata);
-			printf("ttl:%d\n",ptr->ttl);
-		}
-	}
-}
-
-void print_question(DNSQuestion *ptr){
-	if(ptr==NULL)
-		printf("NULL\n");
-	else{
-		printf("asks for %s\n",ptr->host_name);
-	}
-	
-}
-void print_parse_result(packet_Information* pac){
-	printf("----------Printing packet Information---------\n");
-	printf("id:%d ",pac->packet_id);
-	printf(" from:%s:%d",pac->source_ip,pac->source_port);
-	int qcnt=pac->qdcnt;
-	printf("qcnt:%d\n",qcnt);
-	DNSQuestion* qptr=pac->question_head;
-	DNSResourceRecord* rrptr=pac->rr_head;
-	for(int i=1;i<=qcnt;++i){
-		print_question(qptr);
-		qptr=qptr->next;
-	}
-	int a_cnt=pac->ancnt;
-	printf("acnt:%d\n",a_cnt);
-	for(int i=1;i<=a_cnt;++i){
-		print_rr(log_level_global,rrptr);
-		rrptr=rrptr->next;
-	}
-}
 int is_compressed_name(uint8_t ch){
 	return (ch&0xC0)==0xC0;
 }
@@ -135,19 +93,14 @@ int parse_resource_record(uint8_t *msg,unsigned short *ret_offset,DNSResourceRec
 	else if(tmp->type==28){//AAAA
 		DWORD ipbufferlength = 46;
 		tmp->rdata=(uint8_t *)malloc(ipbufferlength);
-		int iRetval = WSAAddressToString((((LPSOCKADDR)(msg+msg_offset))), data_len, NULL, 
-			tmp->rdata, &ipbufferlength );
-		if (iRetval){
-			
-			printf("WSAAddressToString failed with %u\n", WSAGetLastError() );
-		}
+		uint8_t *t=msg+msg_offset;
+		sprintf(tmp->rdata,"%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",t[0],t[1],t[2],t[3],t[4],t[5],t[6],t[7],t[8],t[9],t[10],t[11],t[12],t[13],t[14],t[15]);
 		log_debug(log_level_global,"AAAA type, ipv6:%s\n",tmp->rdata);
 	}
 		
 	*ret_offset=msg_offset+data_len;
 	*rr=tmp;
 	log_debug(log_level_global,"successfully parsed rr, complete at %d\n",*ret_offset);
-	print_rr(log_level_global,*rr);
 	return 0;
 }
 

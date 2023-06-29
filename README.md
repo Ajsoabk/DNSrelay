@@ -17,7 +17,7 @@ windows 10
 
 ## Execution
 ```
-gcc main.c DNSpacket.c DNSparser.c DNSsocket.c Debugger.c PendingQuery.c -lwsock32 -lws2_32  -o main
+gcc main.c DNSpacket.c DNSSerilizer.c DNSparser.c DNSsocket.c Debugger.c PendingQuery.c -lwsock32 -lws2_32  -o main
 main
 ```
 

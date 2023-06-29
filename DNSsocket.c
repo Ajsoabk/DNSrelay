@@ -5,8 +5,9 @@
 #include"DNSpacket.h"
 #include<Windows.h>
 #include"DNSparser.h"
-
+#include"DNScache.h"
 #include"Debugger.h"
+#include"DNSSerilizer.h"
 #include"PendingQuery.h"
 
 SOCKET localDNSSocket;
@@ -115,6 +116,18 @@ int has_debug_msg(packet_Information *pac){
 	}
 	return 0;
 }
+int has_msg(packet_Information *pac,char *str){
+	if(pac!=NULL){
+		DNSQuestion* qptr=pac->question_head;
+		while(qptr!=NULL){
+			if(strcmp(qptr->host_name,str)==0){
+				return 1;
+			}
+			qptr=qptr->next;
+		}
+	}
+	return 0;
+}
 
 int my_recv_dns_msg(){
 	packet_Information packet_info;
@@ -144,11 +157,14 @@ int my_recv_dns_msg(){
 				log_err(log_level_global,"cannot find the pending query with id %d\n",packet->packet_id);
 				ret_val=1;
 			}
-			else if(my_send_to_port(recv_port,RecvBuf,recvBytesCnt)){
-				ret_val=1;
-			}
 			else{
-				log_info(log_level_global,"successfully send dns packet %d to %s:%d\n",packet->packet_id,"127.0.0.1",recv_port);
+				if(my_send_to_port(recv_port,RecvBuf,recvBytesCnt)){
+					log_err(log_level_global,"failed to send to the port:%d\n",recv_port);
+					ret_val=1;
+				}else{
+					cache_response(packet);
+					log_info(log_level_global,"successfully send dns packet %d to %s:%d\n",packet->packet_id,"127.0.0.1",recv_port);
+				}
 			}
 		}
 		else{
@@ -156,6 +172,17 @@ int my_recv_dns_msg(){
 			if(has_debug_msg(packet)){
 				log_level_global=LOG_LEVEL_ALL;
 				log_debug(log_level_global,"switch to debug mode\n");
+			}
+			else if(has_msg(packet,"0.0.0.0")){
+				int len=0;
+				packet_Information err_packet;
+				SecureZeroMemory((void*)&err_packet,sizeof(err_packet));
+				err_packet.packet_id=packet->packet_id;
+				err_packet.rcode=3;
+				err_packet.packet_type=1;//Response;
+				uint8_t SendBuf[1024];
+				serialize_packet(&err_packet,SendBuf,&len);
+				my_send_to_port(packet->source_port,SendBuf,len);
 			}
 			else{
 				

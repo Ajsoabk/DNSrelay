@@ -49,15 +49,6 @@ typedef struct DNSHeader {
 #define SET_RESPONSE(DNSHEADER_PTR)			((DNSHEADER_PTR->flags)&=(1<<15))
 #define SET_REPLY_CODE(DNSHEADER_PTR,value)	((DNSHEADER_PTR->flags)=htons(((~(((1<<16)-1)))&ntohs(DNSHEADER_PTR))|(value))
 
-typedef struct resourceRecord {
-    char *rName;
-    uint16_t rType;
-    uint16_t rClass;
-    uint32_t ttl;
-    uint16_t rdLen;
-    char *rData;
-    struct DNSRR *next;
-}DNSRR;
 
 typedef struct DNSQuestion {
     char *host_name;
@@ -86,6 +77,7 @@ typedef struct packet_Information{
 	char source_ip[50];
 	int source_port;
 	int packet_id;
+	int rcode;
 	DNSQuestion* question_head;
 	DNSResourceRecord* rr_head;
 	int packet_type;

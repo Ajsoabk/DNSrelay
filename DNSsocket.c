@@ -92,10 +92,12 @@ int my_send_to(char *dataFrame,int dfsize,SOCKADDR *destAddr){
 		printf("sendto failed with error: %d\n", WSAGetLastError());
 		return 1;
 	}
+	log_debug(log_level_global,"successfully send a message\n");
 	return 0;
 }
 	
 int my_send_to_port(int port,char *buf,int len){
+	log_debug(log_level_global,"sending message to %d\n",port);
 	struct sockaddr_in addr=get_loop_addr(port);
 	return my_send_to(buf,len,(SOCKADDR*)&addr);
 }
@@ -128,7 +130,36 @@ int has_msg(packet_Information *pac,char *str){
 	}
 	return 0;
 }
-
+/*
+[in]目标端口
+[in]首部id
+*/
+int send_err_msg_to_port(int port,int id){
+	int len=0;
+	packet_Information err_packet;
+	SecureZeroMemory((void*)&err_packet,sizeof(err_packet));
+	err_packet.packet_id=id;
+	err_packet.rcode=3;
+	err_packet.packet_type=1;//Response;
+	/*
+	DNSResourceRecord* rrptr=(DNSResourceRecord*)malloc(sizeof(DNSResourceRecord*));
+	rrptr->name=(char *)malloc(sizeof("0.0.0.0"));
+	strcpy(rrptr->name,"0.0.0.0");
+	rrptr->type=1;
+	rrptr->net_class=1;
+	rrptr->rdata
+	*/
+	uint8_t SendBuf[1024];
+	if(serialize_packet(&err_packet,SendBuf,&len)){
+		log_debug(log_level_global,"failed to serialize\n");
+		return 1;
+	}
+	else{
+		my_send_to_port(port,SendBuf,len);
+	}
+	return 0;
+}
+	
 int my_recv_dns_msg(){
 	packet_Information packet_info;
 	packet_Information *packet=&packet_info;
@@ -169,9 +200,12 @@ int my_recv_dns_msg(){
 		}
 		else{
 			//check if there are any debug message
-			if(has_debug_msg(packet)){
+			if(has_msg(packet,"debug")){
 				log_level_global=LOG_LEVEL_ALL;
 				log_debug(log_level_global,"switch to debug mode\n");
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
+					ret_val=1;
+				}
 			}
 			else if(has_msg(packet,"0.0.0.0")){
 				/*
@@ -182,28 +216,8 @@ int my_recv_dns_msg(){
 					发送回去
 				
 				*/
-				int len=0;
-				packet_Information err_packet;
-				SecureZeroMemory((void*)&err_packet,sizeof(err_packet));
-				err_packet.packet_id=packet->packet_id;
-				err_packet.rcode=3;
-				err_packet.packet_type=1;//Response;
-				/*
-				DNSResourceRecord* rrptr=(DNSResourceRecord*)malloc(sizeof(DNSResourceRecord*));
-				rrptr->name=(char *)malloc(sizeof("0.0.0.0"));
-				strcpy(rrptr->name,"0.0.0.0");
-				rrptr->type=1;
-				rrptr->net_class=1;
-				rrptr->rdata
-				*/
-				uint8_t SendBuf[1024];
-				if(serialize_packet(&err_packet,SendBuf,&len)){
-					log_debug(log_level_global,"failed to serialize\n");
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
 					ret_val=1;
-				}
-				else{
-					
-					my_send_to_port(packet->source_port,SendBuf,len);
 				}
 			}
 			else{

@@ -100,16 +100,19 @@ int serialize_dns_head(packet_Information* pac,uint8_t *buf,int *buf_offset){
 	log_debug(log_level_global,"serializing the packet head\n");
 	DNSHeader new_header;
 	DNSHeader *header=&new_header;
-	SecureZeroMemory(&header,sizeof(DNSHeader));
+	SecureZeroMemory(header,sizeof(DNSHeader));
 	header->ID=BigLittleSwap16(pac->packet_id);
 	header->QDcnt=BigLittleSwap16(pac->qdcnt);
 	header->ANcnt=BigLittleSwap16(pac->ancnt);
+	log_debug(log_level_global,"setting flags\n");
 	unsigned short flags=0;
 	flags|=((pac->packet_type)&1)<<15;
 	flags|=((pac->query_type)&15)<<11;
 	flags|=((pac->rcode)&15);
 	
 	header->flags=BigLittleSwap16(flags);
+	
+	log_debug(log_level_global,"header is serialized in new_header object, copying to buf\n");
 	memcpy(buf,&header,sizeof(DNSHeader));
 	
 	log_debug(log_level_global,"Successfully serialized the packet head\n");

@@ -19,3 +19,11 @@ A         99        www.google.com                          128.242.245.221
 AAAA      152       www.google.com                          2a03:2880:f102:0183:face:b00c:0000:25de 
 A         48        www.google.com                          128.242.245.221                         
 AAAA      101       www.google.com                          2a03:2880:f102:0183:face:b00c:0000:25de 
+A         92        www.google.com                          108.160.166.142                         
+AAAA      18        www.google.com                          2001:0000:0000:0000:0000:0000:68f4:2b23 
+A         41        www.google.com                          108.160.166.142                         
+AAAA      208       www.google.com                          2a03:2880:f11a:0083:face:b00c:0000:25de 
+A         133       www.google.com                          128.242.240.218                         
+AAAA      84        www.google.com                          2001:0000:0000:0000:0000:0000:8079:f34c 
+A         125       www.google.com                          31.13.96.208                            
+AAAA      75        www.google.com                          2a03:2880:f107:0083:face:b00c:0000:25de 

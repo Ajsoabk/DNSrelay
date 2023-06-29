@@ -4,6 +4,7 @@
 #include<ws2tcpip.h>
 #include "DNSpacket.h"
 #include "Debugger.h"
+#include "DNScache.h"
 #define BigLittleSwap16(A)  ((((uint16_t)(A) & 0xff00) >> 8) |(((uint16_t)(A) & 0x00ff) << 8))
 extern int debug_level;
 

@@ -79,7 +79,7 @@ int change_dns_server_name(char *dns_ip){
 }
 void print_help_information(){
 	printf("usage:\n");
-	printf("\tmain -d i\n");
+	printf("\tmain -di\n");
 	printf("\tmain -s 10.3.9.44\n");
 	printf("Options:\n");
 	printf("\t-d\t\tSet the Debug mode , could be followed by i(INFO),w(WARNING),e(ERROR),f(FATAL),o(OFF)\n");
@@ -124,23 +124,24 @@ int initilization(int argc, char **argv){
 				;
 				LOG_LEVEL new_level=LOG_LEVEL_ALL;
 				if(optarg!=NULL){
-					if(strcmp(optarg,"i")==0){
+					if(*optarg=='i'){
 						new_level=LOG_LEVEL_INFO;
 					}
-					else if(strcmp(optarg,"w")==0){
+					else if(*optarg=='w'){
+						
 						new_level=LOG_LEVEL_WARN;
 					}
-					else if(strcmp(optarg,"e")==0){
+					else if(*optarg=='e'){
 						new_level=LOG_LEVEL_ERR;
 					}
-					else if(strcmp(optarg,"f")==0){
+					else if(*optarg=='f'){
 						new_level=LOG_LEVEL_FATAL;
 					}
-					else if(strcmp(optarg,"o")==0){
+					else if(*optarg=='o'){
 						new_level=LOG_LEVEL_OFF;
 					}
 					else{
-						
+						log_warn(log_level_global,"-d followed by an invalid argument %s\n",optarg);
 					}
 				}
 				log_level_switch_to(new_level);
@@ -196,6 +197,7 @@ int initilization(int argc, char **argv){
         printf("optind = %d\t\t", optind);
         printf("argv[optind] = %s\n", argv[optind]);
 		*/
+		
     }  
 	return 0;
 }

@@ -4,6 +4,7 @@
 #include<string.h>
 #include"DNSpacket.h"
 #include<Windows.h>
+#include<unistd.h>
 #include"DNSparser.h"
 #include"DNScache.h"
 #include"Debugger.h"
@@ -12,6 +13,7 @@
 
 SOCKET localDNSSocket;
 char dns_server_addr[100]="10.3.9.44";
+char block_file_name[100]="DNSrelay.txt";
 int my_close_socket(SOCKET soc){
 	int nResult = closesocket(soc);
 	if(nResult==SOCKET_ERROR){
@@ -71,7 +73,35 @@ int create_And_Bind(SOCKET *ret,int port){
 	}
 	return 0;
 }
-int initilization(){
+int change_dns_server_name(char *dns_ip){
+	//TO-DO:check if dns_ip is valid;
+	strcpy(dns_server_addr,dns_ip);
+}
+void print_help_information(){
+	printf("usage:\n");
+	printf("\tmain -d i\n");
+	printf("\tmain -s 10.3.9.44\n");
+	printf("Options:\n");
+	printf("\t-d\t\tSet the Debug mode , could be followed by i(INFO),w(WARNING),e(ERROR),f(FATAL),o(OFF)\n");
+	printf("\t-s\t\tSet the server address\n");
+	printf("\t-f\t\tSet the path of blocklist\n");
+	printf("\t-c\t\tSet the capacity of cache,default %d\n",get_capacity());
+}
+int parse_to_int(char *str){
+	int ret=0;
+	while((*str)!='\0'){
+		if((*str)>='0'&&(*str)<='9'){
+			ret=ret*10+(*str)-'0';
+		}
+		else{
+			return -1;
+		}
+		str++;
+	}
+	return ret;
+}
+		
+int initilization(int argc, char **argv){
 	
 	WSADATA wsaData;
 	int nResult = WSAStartup(MAKEWORD(2,2),&wsaData);
@@ -85,6 +115,88 @@ int initilization(){
 		return 1;
 	}
 	void initialize_cache();
+	int ret=0;
+	//设置调试模式（-d），可选参数，默认为INFO，-d后默认为DEBUG
+	while ((ret = getopt(argc, argv, "d::s:f:hc:")) != -1)
+    {  
+		switch(ret){
+			case 'd':
+				;
+				LOG_LEVEL new_level=LOG_LEVEL_ALL;
+				if(optarg!=NULL){
+					if(strcmp(optarg,"i")==0){
+						new_level=LOG_LEVEL_INFO;
+					}
+					else if(strcmp(optarg,"w")==0){
+						new_level=LOG_LEVEL_WARN;
+					}
+					else if(strcmp(optarg,"e")==0){
+						new_level=LOG_LEVEL_ERR;
+					}
+					else if(strcmp(optarg,"f")==0){
+						new_level=LOG_LEVEL_FATAL;
+					}
+					else if(strcmp(optarg,"o")==0){
+						new_level=LOG_LEVEL_OFF;
+					}
+					else{
+						
+					}
+				}
+				log_level_switch_to(new_level);
+				break;
+			case 's':
+				if(optarg!=NULL){
+					change_dns_server_name(optarg);
+					log_debug(log_level_global,"server ip address is set to %s\n",optarg);
+				}
+				else{
+					
+					log_warn(log_level_global,"-s need to be followed by an argument\n");
+				}
+				break;
+			case 'f':
+				if(optarg!=NULL){
+					
+					FILE *file = fopen(optarg, "r");
+					if (file == NULL) {
+						log_warn(log_level_global,"failed to open the file %s\n",optarg);
+					}
+					else{
+						strcpy(block_file_name,optarg);
+						log_debug(log_level_global,"block file is set to %s\n",optarg);
+					}
+					fclose(file);
+				}
+				else{
+					
+					log_warn(log_level_global,"-f need to be followed by an argument\n");
+				}
+				break;
+			case 'h':
+				print_help_information();
+				return 1;
+			case 'c':
+				;
+				int new_c=parse_to_int(optarg);
+				if(new_c>=0){
+					set_capacity(new_c);
+				}
+				else{
+					log_warn(log_level_global,"invalid argument for -c with %s\n",optarg);
+				}
+				break;
+			default:
+				log_warn(log_level_global,"Invalid argument, using -h to get help\n");
+				break;
+		}	
+		/*
+        printf("ret = %c\t\t", ret);
+        printf("optarg = %s\t\t", optarg);
+        printf("optind = %d\t\t", optind);
+        printf("argv[optind] = %s\n", argv[optind]);
+		*/
+    }  
 	return 0;
 }
 int my_send_to(char *dataFrame,int dfsize,SOCKADDR *destAddr){
@@ -186,12 +298,9 @@ int send_cached_rr_to_port(DNSResourceRecord* r_ptr,packet_Information *pac){
 	clean_up_packet(&cache_packet);
 	return 0;
 }
-/*
-
-*/
 int block_address(packet_Information *packet,int ret_val){
 	int block=0;
-    FILE *file = fopen("DNSrelay.txt", "r");
+    FILE *file = fopen(block_file_name, "r");
     if (file == NULL) {
         log_err(log_level_global, "Failed to open DNSrelay file\n");
         ret_val = 1;
@@ -213,7 +322,7 @@ int block_address(packet_Information *packet,int ret_val){
     fclose(file);
     return block;
 }
-
+	
 int my_recv_dns_msg(){
 	packet_Information packet_info;
 	packet_Information *packet=&packet_info;
@@ -256,8 +365,38 @@ int my_recv_dns_msg(){
             //定义一个会返回0.0.0.0的函数
 			//check if there are any debug message
 			if(has_msg(packet,"debug")){
-				log_level_global=LOG_LEVEL_ALL;
-				log_debug(log_level_global,"switch to debug mode\n");
+				log_level_switch_to(LOG_LEVEL_ALL);
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
+					ret_val=1;
+				}
+			}
+			else if(has_msg(packet,"info")){
+				log_level_switch_to(LOG_LEVEL_INFO);
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
+					ret_val=1;
+				}
+			}
+			else if(has_msg(packet,"warn")){
+				
+				log_level_switch_to(LOG_LEVEL_WARN);
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
+					ret_val=1;
+				}
+			}
+			else if(has_msg(packet, "error")){
+				log_level_switch_to(LOG_LEVEL_ERR);
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
+					ret_val=1;
+				}
+			}
+			else if(has_msg(packet, "fatal")){
+				log_level_switch_to(LOG_LEVEL_FATAL);
+				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
+					ret_val=1;
+				}
+			}
+			else if(has_msg(packet, "off")){
+				log_level_switch_to(LOG_LEVEL_OFF);
 				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
 					ret_val=1;
 				}

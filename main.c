@@ -3,11 +3,10 @@
 #include"DNSsocket.h"
 #include<synchapi.h>
 #include<Windows.h>
-
 int main(int argc, char **argv){
 	
 	int flag=0;
-	if(!initilization()){
+	if(!initilization(argc,argv)){
 		while(!my_recv_dns_msg()){
 		}
 		if(cleanup_All()){

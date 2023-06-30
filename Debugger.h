@@ -2,15 +2,16 @@
 #define DEBUGGER_H
 #include <stdio.h> 
 #include<windows.h>
-enum LOG_LEVEL {    
+typedef enum LOG_LEVEL {    
     LOG_LEVEL_OFF=0,
     LOG_LEVEL_FATAL,
     LOG_LEVEL_ERR,
     LOG_LEVEL_WARN,
     LOG_LEVEL_INFO,
 	LOG_LEVEL_ALL
-};
-extern enum LOG_LEVEL log_level_global;
+}LOG_LEVEL;
+extern LOG_LEVEL log_level_global;
+void log_level_switch_to(LOG_LEVEL new_level);
 
 #define log_fatal(level,format, ...) \
     do { \

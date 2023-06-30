@@ -13,6 +13,10 @@ DNSRR* cache_tail;
 int list_len=0;
 int cache_capacity=10;
 char cache_file[]="cache.txt";
+int get_capacity(){
+	return cache_capacity;
+}
+
 void initialize_cache(){
 	
 	last_flush_time = time(NULL);// get current time;
@@ -46,6 +50,25 @@ void free_RR(DNSRR* rr){
 	return;
 }
 
+int shrink_cache(){
+	log_warn(log_level_global,"shrinking cache...\n");
+	DNSRR *r_ptr=cache_head;
+	cache_head=cache_head->next;
+	if(cache_head==NULL){
+		cache_tail=NULL;
+	}
+	free_RR(r_ptr);
+	list_len--;
+	r_ptr=NULL;
+	log_debug(log_level_global,"cache shrinked successfully\n");
+}
+void set_capacity(int new_capacity){
+	while(list_len>new_capacity){
+		shrink_cache();
+	}
+	log_debug(log_level_global,"cache_capacity is set from %d to %d\n",cache_capacity, new_capacity);
+	cache_capacity=new_capacity;
+}
 void flush_expired_cache(){
 	log_debug(log_level_global,"cache before flush:\n");
 	print_cache_debug();
@@ -174,18 +197,6 @@ void add_RR(DNSRR *r_ptr){
 }
 int cache_is_full(){
 	return list_len>=cache_capacity;
-}
-int shrink_cache(){
-	log_warn(log_level_global,"shrinking cache...\n");
-	DNSRR *r_ptr=cache_head;
-	cache_head=cache_head->next;
-	if(cache_head==NULL){
-		cache_tail=NULL;
-	}
-	free_RR(r_ptr);
-	list_len--;
-	r_ptr=NULL;
-	log_debug(log_level_global,"cache shrinked successfully\n");
 }
 int add_cache(DNSResourceRecord* rrptr){
 	log_debug(log_level_global,"adding cache...\n");

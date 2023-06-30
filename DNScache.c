@@ -70,8 +70,6 @@ void set_capacity(int new_capacity){
 	cache_capacity=new_capacity;
 }
 void flush_expired_cache(){
-	log_debug(log_level_global,"cache before flush:\n");
-	print_cache_debug();
 	DNSRR* c_ptr=cache_head;
 	DNSRR* prev_ptr=NULL;
 	time_t now_time=time(NULL);
@@ -133,8 +131,6 @@ void flush_expired_cache(){
 	}
 	last_flush_time=now_time;
 	
-	log_debug(log_level_global,"cache after flush:\n");
-	print_cache_debug();
 }
 DNSRR * find_cache_with(char *name,int type,int class){
 	log_debug(log_level_global,"finding cache with name %s,type %d, class %d\n...",name,type,class);

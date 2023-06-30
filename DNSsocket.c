@@ -186,9 +186,11 @@ int send_cached_rr_to_port(DNSResourceRecord* r_ptr,packet_Information *pac){
 	clean_up_packet(&cache_packet);
 	return 0;
 }
+/*
 
-char* block_address(packet_Information *packet,int ret_val){
-    char* block=malloc(sizeof(64));
+*/
+int block_address(packet_Information *packet,int ret_val){
+	int block=0;
     FILE *file = fopen("DNSrelay.txt", "r");
     if (file == NULL) {
         log_err(log_level_global, "Failed to open DNSrelay file\n");
@@ -203,13 +205,12 @@ char* block_address(packet_Information *packet,int ret_val){
                 if (strcmp(packet->question_head->host_name,domain)==0&&packet->query_type==0){
                     //printf("domain is %s\n", domain);
                     //printf("host name is %s\n", packet->question_head->host_name);
-                    block="0.0.0.0";
+					block=1;
                     log_err(log_level_global,"no such name\n");
-                    return block;
                 }
         }
-        fclose(file);
     }
+    fclose(file);
     return block;
 }
 
@@ -261,7 +262,7 @@ int my_recv_dns_msg(){
 					ret_val=1;
 				}
 			}
-			else if(has_msg(packet,block_address(packet,ret_val))){
+			else if(block_address(packet,ret_val)){
 				send_err_msg_to_port(packet->source_port,packet->packet_id);
 				
                 /*

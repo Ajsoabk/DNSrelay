@@ -143,14 +143,6 @@ int send_err_msg_to_port(int port,int id){
 	err_packet.packet_id=id;
 	err_packet.rcode=3;
 	err_packet.packet_type=1;//Response;
-	/*
-	DNSResourceRecord* rrptr=(DNSResourceRecord*)malloc(sizeof(DNSResourceRecord*));
-	rrptr->name=(char *)malloc(sizeof("0.0.0.0"));
-	strcpy(rrptr->name,"0.0.0.0");
-	rrptr->type=1;
-	rrptr->net_class=1;
-	rrptr->rdata
-	*/
 	uint8_t SendBuf[1024];
 	SecureZeroMemory(SendBuf,1024);
 	if(serialize_packet(&err_packet,SendBuf,&len)){
@@ -195,6 +187,32 @@ int send_cached_rr_to_port(DNSResourceRecord* r_ptr,packet_Information *pac){
 	return 0;
 }
 
+char* block_address(packet_Information *packet,int ret_val){
+    char* block=malloc(sizeof(64));
+    FILE *file = fopen("DNSrelay.txt", "r");
+    if (file == NULL) {
+        log_err(log_level_global, "Failed to open DNSrelay file\n");
+        ret_val = 1;
+    }
+    else {
+        //log_err(log_level_global,"BLOCK!!!\n");
+        char line[100];
+        char domain[100];
+        while (fgets(line, sizeof(line), file)) {
+            sscanf(line, "%*s %s", domain);
+                if (strcmp(packet->question_head->host_name,domain)==0&&packet->query_type==0){
+                    //printf("domain is %s\n", domain);
+                    //printf("host name is %s\n", packet->question_head->host_name);
+                    block="0.0.0.0";
+                    log_err(log_level_global,"no such name\n");
+                    return block;
+                }
+        }
+        fclose(file);
+    }
+    return block;
+}
+
 int my_recv_dns_msg(){
 	packet_Information packet_info;
 	packet_Information *packet=&packet_info;
@@ -234,6 +252,7 @@ int my_recv_dns_msg(){
 			}
 		}
 		else{
+            //定义一个会返回0.0.0.0的函数
 			//check if there are any debug message
 			if(has_msg(packet,"debug")){
 				log_level_global=LOG_LEVEL_ALL;
@@ -242,19 +261,26 @@ int my_recv_dns_msg(){
 					ret_val=1;
 				}
 			}
-			else if(has_msg(packet,"0.0.0.0")){
-				/*
-				逐行读一个静态表，table.txt
-				判断packet->question_head->host_name是否等于当前行的域名
-				如果相等
-					组装一个rcode=3的错误dns包
-					发送回去
+			else if(has_msg(packet,block_address(packet,ret_val))){
+				send_err_msg_to_port(packet->source_port,packet->packet_id);
 				
+                /*
+                逐行读一个静态表，table.txt
+                判断packet->question_head->host_name是否等于当前行的域名
+                如果相等
+                    组装一个rcode=3的错误dns包
+                    发送回去
+                */
+				/*
+				DNSResourceRecord* rrptr=(DNSResourceRecord*)malloc(sizeof(DNSResourceRecord*));
+				rrptr->name=(char *)malloc(sizeof("0.0.0.0"));
+				strcpy(rrptr->name,"0.0.0.0");
+				rrptr->type=1;
+				rrptr->net_class=1;
+				rrptr->rdata
 				*/
-				if(send_err_msg_to_port(packet->source_port,packet->packet_id)){
-					ret_val=1;
-				}
-			}
+
+            }
 			else{
 				DNSResourceRecord* cached_rr=find_in_cache(packet->question_head);
 				if(cached_rr!=NULL){

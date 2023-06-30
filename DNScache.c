@@ -206,7 +206,7 @@ int add_cache(DNSResourceRecord* rrptr){
 	}
 	DNSRR* tmp_ptr;
 	if((tmp_ptr=find_cache_with(rrptr->name,rrptr->type,rrptr->net_class))!=NULL){
-		log_debug(log_level_global,"find an identical cache in the list, updating the ttl to %d",rrptr->ttl);
+		log_debug(log_level_global,"find an identical cache in the list, updating the ttl to %d\n",rrptr->ttl);
 		tmp_ptr->ttl=rrptr->ttl;
 		return 0;
 	}

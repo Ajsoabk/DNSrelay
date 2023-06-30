@@ -149,8 +149,6 @@ char* block_address(packet_Information *packet,int ret_val){
                     log_err(log_level_global,"no such name\n");
                     return block;
                 }
-
-
         }
         fclose(file);
     }

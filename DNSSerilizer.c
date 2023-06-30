@@ -11,8 +11,8 @@
 int convert_dot_to_digit(char* host_name,unsigned char *buf,int *len){
 	
 	char *name_ptr=host_name;
-	char *last_place=buf;
-	char *buf_ptr=buf+1;
+	char *last_place=buf+*len;
+	char *buf_ptr=buf+*len+1;
 	int label_len=0;
 	int offset=1;
 	while(*name_ptr!='\0'){
@@ -32,7 +32,7 @@ int convert_dot_to_digit(char* host_name,unsigned char *buf,int *len){
 	}
 	*last_place=label_len;
 	*buf_ptr=(unsigned char)0;
-	*len=offset;
+	*len+=offset;
 	return 0;
 }
 /*
@@ -98,24 +98,24 @@ int split_ipv6_by_comma(char *ipv6,unsigned char *buf){
 */
 int serialize_dns_head(packet_Information* pac,uint8_t *buf,int *buf_offset){
 	log_debug(log_level_global,"serializing the packet head\n");
-	DNSHeader new_header;
-	DNSHeader *header=&new_header;
-	SecureZeroMemory(header,sizeof(DNSHeader));
-	header->ID=BigLittleSwap16(pac->packet_id);
-	header->QDcnt=BigLittleSwap16(pac->qdcnt);
-	header->ANcnt=BigLittleSwap16(pac->ancnt);
-	log_debug(log_level_global,"setting flags\n");
+	
 	unsigned short flags=0;
 	flags|=((pac->packet_type)&1)<<15;
 	flags|=((pac->query_type)&15)<<11;
 	flags|=((pac->rcode)&15);
+	log_debug(log_level_global,"flags =%d %x %x \n",flags,flags&0x00f0,flags&0x000f);
+	buf[1]=(pac->packet_id)&0x00ff;
+	buf[0]=((pac->packet_id)&0xff00)>>8;
+	buf[3]=(flags)&0x00ff;
+	buf[2]=((flags)&0xff00)>>8;
+	buf[5]=(pac->qdcnt)&0x00ff;
+	buf[4]=((pac->qdcnt)&0xff00)>>8;
+	buf[7]=(pac->ancnt)&0x00ff;
+	buf[6]=((pac->ancnt)&0xff00)>>8;
+	*buf_offset+=sizeof(DNSHeader);
+	log_debug(log_level_global,"buf:%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",buf[0],buf[1],buf[2],buf[3],buf[4],buf[5],buf[6],buf[7],buf[8],buf[9],buf[10],buf[11]);
+	log_debug(log_level_global,"Successfully serialized the packet head with offst%d\n",*buf_offset);
 	
-	header->flags=BigLittleSwap16(flags);
-	
-	log_debug(log_level_global,"header is serialized in new_header object, copying to buf\n");
-	memcpy(buf,&header,sizeof(DNSHeader));
-	
-	log_debug(log_level_global,"Successfully serialized the packet head\n");
 	return 0;
 }
 /*
@@ -127,18 +127,18 @@ int serialize_question(DNSQuestion* qptr,uint8_t *buf,int *buf_offset){
 		log_err(log_level_global,"Question pointer is NULL, failed to serialize\n");
 		return 1;
 	}
-	int offset=0;
+	int offset=*buf_offset;
 	convert_dot_to_digit(qptr->host_name,buf,&offset);
 	*((uint16_t*)(buf+offset+1))=BigLittleSwap16(qptr->host_type);
 	*((uint16_t*)(buf+offset+3))=BigLittleSwap16(qptr->net_class);
-	*buf_offset=offset;
-	log_debug(log_level_global,"Successfully serialized question\n");
+	*buf_offset=offset+5;
+	log_debug(log_level_global,"Successfully serialized question with offset %d\n",offset);
 }
 /*
 资源记录（rr）序列化
 */
 int serialize_rr(DNSResourceRecord* rrptr,uint8_t *buf,int *buf_offset){
-	log_debug(log_level_global,"serializing resource record\n");
+	log_debug(log_level_global,"serializing resource record with offset %d\n",*buf_offset);
 	if(rrptr==NULL){
 		log_err(log_level_global,"Resource Record pointer is NULL,failed to serialize\n");
 		return 1;
@@ -147,21 +147,29 @@ int serialize_rr(DNSResourceRecord* rrptr,uint8_t *buf,int *buf_offset){
 		log_err(log_level_global,"Resource Record type is not supported\n");
 		return 1;
 	}
-	int offset=0;
-	convert_dot_to_digit(rrptr->name,buf,&offset);
+	int offset=*buf_offset;
+	//convert_dot_to_digit(rrptr->name,buf,&offset);
+	*((uint16_t*)(buf+offset))=BigLittleSwap16(0xc00c);
+	offset+=1;
 	*((uint16_t*)(buf+offset+1))=BigLittleSwap16(rrptr->type);
 	*((uint16_t*)(buf+offset+3))=BigLittleSwap16(rrptr->net_class);
-	*((uint16_t*)(buf+offset+5))=BigLittleSwap16(rrptr->ttl);
+	*((uint16_t*)(buf+offset+5))=htonl(rrptr->ttl);
+	if(rrptr->type==1)
+		*((uint16_t*)(buf+offset+9))=BigLittleSwap16(4);
+	else 
+		*((uint16_t*)(buf+offset+9))=BigLittleSwap16(16);
+	offset+=11;
 	if(rrptr->type==1){
-		split_ipv4_by_dots(rrptr->rdata,buf);
+		split_ipv4_by_dots(rrptr->rdata,buf+offset);
 		offset+=4;
 	}
 	else{
-		split_ipv6_by_comma(rrptr->rdata,buf);
+		split_ipv6_by_comma(rrptr->rdata,buf+offset);
 		offset+=16;
 	}
+	log_debug(log_level_global," Successfully serialized resource record with offset %d\n",offset);
+	*buf_offset=offset;
 	return 0;
-	log_debug(log_level_global," Successfully serialized resource record\n");
 }
 /*
 dns包序列化
@@ -196,8 +204,8 @@ int serialize_packet(packet_Information* pac,uint8_t *buf,int *len){
 		}
 		rrptr=rrptr->next;
 	}
-	log_debug(log_level_global,"Resource record section serialized.\n");
-	log_debug(log_level_global,"Successfully serialized a packet into network format\n");
+	*len=offset;
+	log_debug(log_level_global,"Successfully serialized a packet into network format with len %d\n",*len);
 	return 0;
 }
 /*

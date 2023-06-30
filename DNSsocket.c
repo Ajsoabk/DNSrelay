@@ -84,6 +84,7 @@ int initilization(){
 		WSACleanup();
 		return 1;
 	}
+	void initialize_cache();
 	return 0;
 }
 int my_send_to(char *dataFrame,int dfsize,SOCKADDR *destAddr){
@@ -135,6 +136,7 @@ int has_msg(packet_Information *pac,char *str){
 [in]首部id
 */
 int send_err_msg_to_port(int port,int id){
+	log_debug(log_level_global,"Sending error message to port %d with id %d\n",port,id);
 	int len=0;
 	packet_Information err_packet;
 	SecureZeroMemory((void*)&err_packet,sizeof(err_packet));
@@ -150,16 +152,49 @@ int send_err_msg_to_port(int port,int id){
 	rrptr->rdata
 	*/
 	uint8_t SendBuf[1024];
+	SecureZeroMemory(SendBuf,1024);
 	if(serialize_packet(&err_packet,SendBuf,&len)){
 		log_debug(log_level_global,"failed to serialize\n");
 		return 1;
 	}
-	else{
-		my_send_to_port(port,SendBuf,len);
-	}
+	log_debug(log_level_global,"serialized into a byte array of length %d\n",len);
+	my_send_to_port(port,SendBuf,len);
+	log_debug(log_level_global,"successfully send a error message\n");
 	return 0;
 }
+
+int send_cached_rr_to_port(DNSResourceRecord* r_ptr,packet_Information *pac){
+	log_debug(log_level_global,"Sending cached response to port %d with id %d\n",pac->source_port,pac->packet_id);
+	packet_Information cache_packet;
+	SecureZeroMemory(&cache_packet,sizeof(cache_packet));
+	cache_packet.packet_id=pac->packet_id;
+	cache_packet.packet_type=1;
+	cache_packet.qdcnt=pac->qdcnt;
+	cache_packet.question_head=pac->question_head;
+	pac->question_head=NULL;
+	pac->qdcnt=0;
 	
+	uint8_t SendBuf[1024];
+	SecureZeroMemory(SendBuf,1024);
+	cache_packet.rr_head=r_ptr;
+	cache_packet.ancnt=1;
+	int len=0;
+	if(serialize_packet(&cache_packet,SendBuf,&len)){
+		log_err(log_level_global,"failed to serialize cached rr\n");
+		return 1;
+	}
+	
+	log_debug(log_level_global,"serialized into a byte array of length %d\n",len);
+	if(my_send_to_port(pac->source_port,SendBuf,len)){
+		log_debug(log_level_global,"failed to send cached msg to %d\n",pac->source_port);
+	}
+	else{
+		log_debug(log_level_global," Successfully send cached response\n");
+	}
+	clean_up_packet(&cache_packet);
+	return 0;
+}
+
 int my_recv_dns_msg(){
 	packet_Information packet_info;
 	packet_Information *packet=&packet_info;
@@ -221,20 +256,33 @@ int my_recv_dns_msg(){
 				}
 			}
 			else{
-				
-				push_in_pool(packet->packet_id,packet->source_port);
-				log_debug(log_level_global,"query with id %d , port %d is pending for response\n",packet->packet_id,packet->source_port);
-				if(my_send_to_server(RecvBuf,recvBytesCnt)){
-					log_err(log_level_global,"failed to send query to server\n");
-					ret_val=1;
+				DNSResourceRecord* cached_rr=find_in_cache(packet->question_head);
+				if(cached_rr!=NULL){
+					
+					log_debug(log_level_global,"using cache to response\n");
+					send_cached_rr_to_port(cached_rr,packet);
 				}
 				else{
-					log_debug(log_level_global,"successfully send query %d to server\n",packet->packet_id);
+					
+					push_in_pool(packet->packet_id,packet->source_port);
+					log_debug(log_level_global,"query with id %d , port %d is pending for response\n",packet->packet_id,packet->source_port);
+					if(my_send_to_server(RecvBuf,recvBytesCnt)){
+						log_err(log_level_global,"failed to send query to server\n");
+						ret_val=1;
+					}
+					else{
+						log_debug(log_level_global,"successfully send query %d to server\n",packet->packet_id);
+					}
 				}
+				log_debug(log_level_global,"cache in this loop is:\n");
+				print_cache_debug();
 			}
 		}
 	}
+	
 	clean_up_packet(packet);
+	log_debug(log_level_global,"cache after the process of the packet\n");
+	print_cache_debug();
 	log_debug(log_level_global,"complete \n\n");
 	return 0;
 }

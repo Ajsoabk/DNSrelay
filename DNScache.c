@@ -133,7 +133,8 @@ void flush_expired_cache(){
 	
 }
 DNSRR * find_cache_with(char *name,int type,int class){
-	log_debug(log_level_global,"finding cache with name %s,type %d, class %d\n...",name,type,class);
+	if(type==5)return NULL;
+	log_debug(log_level_global,"finding cache with name %s,type %d, class %d...\n",name,type,class);
 	flush_expired_cache();
 	print_cache_debug();
 	DNSRR* c_ptr=cache_head;
@@ -198,6 +199,10 @@ int add_cache(DNSResourceRecord* rrptr){
 	log_debug(log_level_global,"adding cache...\n");
 	if(rrptr==NULL){
 		log_warn(log_level_global,"DNSResourceRecord pointer is NULL, failed to add it into cache\n");
+		return 1;
+	}
+	if(rrptr->type!=1&&rrptr->type!=28){
+		log_warn(log_level_global,"type %d not supported\n",rrptr->type);
 		return 1;
 	}
 	if(rrptr->ttl==0){
@@ -294,7 +299,10 @@ int cache_response(packet_Information *pac){
 		return 1;
 	}
 	DNSResourceRecord *rrptr=pac->rr_head;
+	
+	log_debug(log_level_global,"tt size is %d\n",pac->ancnt);
 	while(rrptr!=NULL){
+		log_debug(log_level_global,"attempting to add a cache with type %d\n",rrptr->type);
 		add_cache(rrptr);
 		rrptr=rrptr->next;
 	}

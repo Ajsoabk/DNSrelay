@@ -427,7 +427,7 @@ int my_recv_dns_msg(){
 				DNSResourceRecord* cached_rr=find_in_cache(packet->question_head);
 				if(cached_rr!=NULL){
 					
-					log_debug(log_level_global,"using cache to response\n");
+					log_warn(log_level_global,"using cache to response\n");
 					send_cached_rr_to_port(cached_rr,packet);
 				}
 				else{

@@ -143,8 +143,8 @@ char* block_address(packet_Information *packet,int ret_val){
         while (fgets(line, sizeof(line), file)) {
             sscanf(line, "%*s %s", domain);
                 if (strcmp(packet->question_head->host_name,domain)==0&&packet->query_type==0){
-                    printf("domain is %s\n", domain);
-                    printf("host name is %s\n", packet->question_head->host_name);
+                    //printf("domain is %s\n", domain);
+                    //printf("host name is %s\n", packet->question_head->host_name);
                     block="0.0.0.0";
                     log_err(log_level_global,"no such name\n");
                     return block;
